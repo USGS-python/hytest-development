@@ -18,6 +18,10 @@ run until the prior job completes successfully (e.g. rechunking must complete
 successfully before the zarr merging job will run). Job output is saved into 
 the current working directory.
 
+Please note: for the batch jobs to work a conda environment named `pangeo` must
+exist (with all required libraries) and the scripts must be in the current 
+working directory from where the shell script it run.
+
 ## Manual execution in an interactive job
 To manually run the rechunker
 ```bash
