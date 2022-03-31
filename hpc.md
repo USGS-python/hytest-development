@@ -49,8 +49,8 @@ mamba create -n hytest -c conda-forge \
       python dask jupyterlab dask-jobqueue ipywidgets \
       xarray zarr numcodecs hvplot geoviews datashader  \
       jupyter-server-proxy widgetsnbextension dask-labextension
-
-Depending on your application, you may choose to add additional conda packages to this list.
+```
+*Note: you can add additional conda packages you need to this list.  Packages available through conda-forge can be explored at https://anaconda.org. 
 
 Activate this environment:
 ```bash
@@ -94,6 +94,7 @@ Now that we have Jupyter configured, we can start a notebook server on our inter
 
 ```bash
 (pangeo) rsignell@nid00243:~> more ~/bin/start_jupyter
+
 #!/bin/bash
 source activate hytest
 cd $HOME/HyTest/Projects
