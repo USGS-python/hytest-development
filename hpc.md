@@ -82,11 +82,7 @@ export DASK_DISTRIBUTED__DASHBOARD__LINK="/proxy/8787/status"
 ```
 ------------------------------------------------------------------------
 
-From here, we have two options. Option 1 will start a Jupyter Notebook server and manage dask using the
-[dask-jobqueue](http://dask-jobqueue.readthedocs.io) package. Option 2 will start a dask cluster using [dask-mpi]{.title-ref} and will run a Jupyter server as part of the dask cluster. We generally recommend starting with Option 1, especially if you will be working interactively, unless you have a reason for managing the job submission scripts on your
-own. Users that will be using dask in batch-style workflows may prefer Option 2.
 
-## Deploy Option 1: Jupyter + dask-jobqueue
 
 ### Start a Jupyter Notebook Server
 
