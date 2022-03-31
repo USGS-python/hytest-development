@@ -1,6 +1,6 @@
-# Getting started with HyTest with on-prem HPC 
+# Getting started with Pangeo with on-prem HPC 
 
-This tutorial covers how to set up and use the HyTest Framework on USGS High Performance Computing (HPC) systems:
+This tutorial covers how to set up and use the Pangeo  Environment on USGS High Performance Computing (HPC) systems:
 
 1.  Installing [conda](https://conda.io/docs/) and creating a custom Hytest conda environment 
 2.  Configuring [Jupyter](https://jupyter.org/)
@@ -18,12 +18,12 @@ line.
 
 First log into Denali or Tallgrass.  You will need to be on doi.net to assess these systems, so if you are remote you will need to use the VPN (Pulse Secure) or login to an AWS Workspace machine (if you have one).  
 
-After logging in, request interactive access to a compute node so that you are not working on the main node. You can do this using a command like:
+After logging in, request interactive access to a compute node so that you are not working on the main node. You can do this by creating a script like this in your `~/bin` directory:
 ```bash
 #!/bin/bash
 salloc -A woodshole -t 02:00:00 -N 1 srun --pty bash
 ```
-which requests a node for 2 hours using the "woodshole" account.  You need to use your account name and adjust the time accordingly. 
+which when executed, requests a node for 2 hours using the "woodshole" account.  You need to use your account name and adjust the time accordingly. 
 
 Next install the Conda package managment system to allow generation of self-contained Python environments without involving system admins. We will install "Mamba", which is a drop drop-in replacement for "conda" providing a fast, efficient and license-free way to run conda commands.  Copy and paste these lines to the terminal:
 
@@ -45,26 +45,26 @@ directory with the `conda-forge` channel setting.
 
 Now let's create a new conda environment for our HyTest work:
 ```bash
-mamba create -n hytest -c conda-forge \
+mamba create -n pangeo -c conda-forge \
       python dask jupyterlab dask-jobqueue ipywidgets \
       xarray zarr numcodecs hvplot geoviews datashader  \
-      jupyter-server-proxy widgetsnbextension dask-labextension
+      jupyter-server-proxy widgetsnbextension dask-labextension intake-xarray
 ```
 *Note: you can add additional conda packages you need to this list.  Packages available through conda-forge can be explored at https://anaconda.org. 
 
 Activate this environment:
 ```bash
-conda activate hytest
+conda activate pangeo
 ```
-Your prompt should now look something like this (note the "hytest" environment name):
+Your prompt should now look something like this (note the "pangeo" environment name):
 ```
-(hytest) $
+(pangeo) $
 ```
 
 And if you ask where your Python command lives, it should direct you to somewhere in your home directory:
 ```
 (hytest) $ which python
-$HOME/Miniforge3/envs/hytest/bin/python
+$HOME/mambaforge/envs/pangeo/bin/python
 ```
 ## Configure Jupyter
 
@@ -106,7 +106,7 @@ echo "        local computer:"
 echo ""
 echo "        ssh -N -L 8889:$HOST:$JPORT  USER@$SLURM_CLUSTER_NAME.cr.usgs.gov"
 echo ""
-echo "Step 3: Browse to https://localhost:8889 on your local computer"
+echo "Step 3: Browse to http://localhost:8889 on your local computer"
 echo ""
 echo ""
 jupyter lab --no-browser --ip=$HOST --port=$JPORT
