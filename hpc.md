@@ -63,7 +63,7 @@ Your prompt should now look something like this (note the "pangeo" environment n
 
 And if you ask where your Python command lives, it should direct you to somewhere in your home directory:
 ```
-(hytest) $ which python
+(pangeo) $ which python
 $HOME/mambaforge/envs/pangeo/bin/python
 ```
 ## Configure Jupyter
@@ -92,7 +92,7 @@ Now that we have Jupyter configured, we can start a notebook server on our inter
 (pangeo) rsignell@nid00243:~> more ~/bin/start_jupyter
 
 #!/bin/bash
-source activate hytest
+source activate pangeo
 cd $HOME/HyTest/Projects
 HOST=`hostname`
 JPORT=$(shuf -i 8400-9400 -n 1)
