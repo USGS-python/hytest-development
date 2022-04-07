@@ -31,6 +31,8 @@ Next install the Conda package managment system to allow generation of self-cont
 curl -L -O "https://github.com/conda-forge/miniforge/releases/latest/download/Mambaforge-$(uname)-$(uname -m).sh"
 
 bash Mambaforge-$(uname)-$(uname -m).sh
+
+export PATH=$HOME/mambaforge/bin:$PATH
 ```
 Answer "yes" to accept the license agreement, and "yes" when it asks if you want the script to run `conda init`. 
 
@@ -40,7 +42,7 @@ Now update your conda package manager with packages from the conda-forge channel
 conda config --add channels conda-forge --force 
 mamba update --all
 ```
-This will create a ``./condarc`` in your home
+This will create a ``./.condarc`` in your home
 directory with the `conda-forge` channel setting. 
 
 Now let's create a new conda environment for our HyTest work:
