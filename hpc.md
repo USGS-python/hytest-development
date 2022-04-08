@@ -88,7 +88,7 @@ export DASK_DISTRIBUTED__DASHBOARD__LINK="/proxy/8787/status"
 
 ### Start a Jupyter Notebook Server
 
-Now that we have Jupyter configured, we can start a notebook server on our interactive compute node.  We can use a script like this: 
+Now that we have Jupyter configured, we can start a notebook server on our interactive compute node.  We can create a script like the one below in our ~/bin directory. Be sure to change "cd $HOME/HyTest/Projects" to your own directory path. (nano is a convenient text editor)
 
 ```bash
 (pangeo) rsignell@nid00243:~> more ~/bin/start_jupyter
