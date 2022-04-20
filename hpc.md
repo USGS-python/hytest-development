@@ -78,7 +78,7 @@ jupyter server password
 This creates the file `~/.jupyter/jupyter_server_config.py`. 
 
 Finally, we configure dask\'s dashboard to forward through
-Jupyter.  Add this line to your `~/.bashrc` file:
+Jupyter.  Add the following line to your `~/.bashrc` file (text editors include vi and nano):
 ```
 export DASK_DISTRIBUTED__DASHBOARD__LINK="/proxy/8787/status"
 ```
@@ -88,7 +88,7 @@ export DASK_DISTRIBUTED__DASHBOARD__LINK="/proxy/8787/status"
 
 ### Start a Jupyter Notebook Server
 
-Now that we have Jupyter configured, we can start a notebook server on our interactive compute node.  We can create a script like the one below in our ~/bin directory. Be sure to change "cd $HOME/HyTest/Projects" to your own directory path. (nano is a convenient text editor)
+Now that we have Jupyter configured, we can start a notebook server on our interactive compute node.  First we can create a script like the one below.  Using a text editor such as vi or nano, open a file named "start_jupyter" in your ~/bin directory; then copy and paste the text below into the file. Be sure to change "$HOME/HyTest/Projects" to your own directory path, as appropriate, and then save the file.
 
 ```bash
 (pangeo) rsignell@nid00243:~> more ~/bin/start_jupyter
@@ -106,14 +106,19 @@ echo ""
 echo "Step 2: Copy this ssh command into a terminal on your"
 echo "        local computer:"
 echo ""
-echo "        ssh -N -L 8889:$HOST:$JPORT  USER@$SLURM_CLUSTER_NAME.cr.usgs.gov"
+echo "        ssh -N -L 8889:$HOST:$JPORT  $USER@$SLURM_CLUSTER_NAME.cr.usgs.gov"
 echo ""
 echo "Step 3: Browse to http://localhost:8889 on your local computer"
 echo ""
 echo ""
 jupyter lab --no-browser --ip=$HOST --port=$JPORT
 ```
-Then follow the Steps 1,2,3 printed out by the script to get connected.
+Now make your script executable and run it:
+```
+(pangeo) $ chmod u+x ~/bin/start_jupyter
+(pangeo) $ start_jupyter
+```
+Follow the Steps 1,2,3 printed out by the script to get connected. Note that after you login using the ssh command in Step 2, the cursor will hang.  This is expected and you can minimize the window.
 
 ### Launch Dask with dask-jobqueue
 
