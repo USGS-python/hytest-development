@@ -18,12 +18,12 @@ line.
 
 First log into Denali or Tallgrass.  You will need to be on doi.net to assess these systems, so if you are remote you will need to use the VPN (Pulse Secure) or login to an AWS Workspace machine (if you have one).  
 
-After logging in, request interactive access to a compute node so that you are not working on the main node. You can do this by creating a script like this in your `~/bin` directory:
+After logging in, request interactive access to a compute node so that you are not working on the main node. You can do this either by entering a "salloc" command similar to the following, or by creating a script like this in your `~/bin` directory:
 ```bash
 #!/bin/bash
 salloc -A woodshole -t 02:00:00 -N 1 srun --pty bash
 ```
-which when executed, requests a node for 2 hours using the "woodshole" account.  You need to use your account name and adjust the time accordingly. 
+which when executed, requests a node for 2 hours using the "woodshole" account.  You need to use your account name and adjust the time accordingly. (Note that at times a node with the requested resources will not be available and you will receive a "request pending" message; if this happens you can quit the command, logout, and try logging into a different HPC machine.)
 
 Next install the Conda package managment system to allow generation of self-contained Python environments without involving system admins. We will install "Mamba", which is a drop drop-in replacement for "conda" providing a fast, efficient and license-free way to run conda commands.  Copy and paste these lines to the terminal:
 
@@ -34,7 +34,7 @@ bash Mambaforge-$(uname)-$(uname -m).sh
 
 export PATH=$HOME/mambaforge/bin:$PATH
 ```
-Answer "yes" to accept the license agreement, and "yes" when it asks if you want the script to run `conda init`. 
+For the bash command, answer "yes" to accept the license agreement. For the next prompt hit Enter to confirm or to specify a different location. And then answer "yes" when it asks if you want the script to run `conda init`. 
 
 Now update your conda package manager with packages from the conda-forge channel:
 
