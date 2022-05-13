@@ -1,11 +1,12 @@
 #!/usr/bin/env python
 
 # import numpy as np
-# import os
+import os
 import argparse
 import dask
 import datetime
 import fsspec
+# import numpy as np
 import pandas as pd
 import rechunker
 import time
@@ -14,6 +15,7 @@ import zarr
 
 from dask.distributed import Client
 
+# CONUS404_W_d01_1980-09-30_23:00:00.nc  CONUS404_Z_d01_1980-09-30_23:00:00.nc
 
 def build_filelist(num_days, c_start, wrf_dir):
     job_files = []
@@ -58,7 +60,15 @@ def read_metadata(filename):
 
 
 def apply_metadata(ds, rename_dims, rename_vars, remove_attrs, var_metadata):
-    ds = ds.rename(rename_dims)
+    avail_dims = ds.dims.keys()
+    rename_dims_actual = {}
+
+    # Only change dimensions that exist in dataset
+    for kk, vv in rename_dims.items():
+        if kk in avail_dims:
+            rename_dims_actual[kk] = vv
+
+    ds = ds.rename(rename_dims_actual)
     ds = ds.assign_coords({'time': ds.XTIME})
 
     # Modify the attributes
@@ -127,36 +137,134 @@ def rechunker_wrapper(source_store, target_store, temp_store, chunks=None,
         print('done')
 
 
+def set_file_path(path1, path2=None):
+    '''Helper function to check/set the full path to a file.
+       path1 should include a filename
+       path2 should only be a directory'''
+
+    file_path = None
+
+    if os.path.isfile(path1):
+        # File exists, use the supplied path
+        file_path = os.path.realpath(path1)
+    else:
+        # file does not exist
+        if path2:
+            file_path = os.path.realpath(f'{path2}/{path1}')
+
+            if os.path.isfile(file_path):
+                # File exists in path2 so append it to the path
+                print(f'Using filepath, {file_path}')
+            else:
+                raise FileNotFoundError(f'File, {path1}, does not exist in {path2}')
+        else:
+            raise FileNotFoundError(f'File, {path1}, does not exist')
+
+    return file_path
+
+
+def set_target_path(path, base_dir=None, verbose=False):
+    new_path = None
+
+    if os.path.isdir(path):
+        # We're good, use it
+        new_path = os.path.realpath(path)
+        if verbose:
+            print(f'{new_path} exists.')
+    else:
+        # path is not a directory, does the parent directory exist?
+        pdir = os.path.dirname(path)
+
+        if pdir == '':
+            # There is no parent directory, try using base_dir if it exists
+            if base_dir:
+                # create/use
+                if not os.path.isdir(base_dir):
+                    raise FileNotFoundError(f'Base directory, {base_dir}, does not exist')
+
+                new_path = f'{base_dir}/{path}'
+
+                if os.path.isdir(new_path):
+                    if verbose:
+                        print(f'Using existing target path, {new_path}')
+                else:
+                    os.mkdir(new_path)
+
+                    if verbose:
+                        print(f'Creating target relative to base directory, {new_path}')
+            else:
+                # No base_dir supplied; create target path in current directory
+                new_path = os.path.realpath(path)
+                os.mkdir(new_path)
+
+                if verbose:
+                    print(f'Target path, {new_path}, created')
+        elif os.path.isdir(pdir):
+            # Parent path exists we just need to create the child directory
+            new_path = os.path.realpath(path)
+            os.mkdir(new_path)
+
+            if verbose:
+                print(f'Parent, {pdir}, exists. Created {new_path} directory')
+        else:
+            # print(f'ERROR: Parent of target path does not exist.')
+            raise FileNotFoundError(f'Parent, {pdir}, of target path, {path}, does not exist')
+
+    return new_path
+
+
 def main():
-    parser = argparse.ArgumentParser(description='Create cloud-optimized zarr files from WRF CONUS404')
+    parser = argparse.ArgumentParser(description='Create cloud-optimized zarr files from WRF CONUS404 model output files')
     parser.add_argument('-i', '--index', help='Index to process', required=True)
+    parser.add_argument('-b', '--base_dir', help='Directory to work in', required=False, default=None)
+    parser.add_argument('-w', '--wrf_dir', help='Base directory for WRF model output files', required=True)
+    parser.add_argument('-c', '--constants_file', help='Path to WRF constants', required=False, default=None)
+    parser.add_argument('-v', '--vars_file', help='File containing list of variables to include in output', required=True)
+    parser.add_argument('-d', '--dst_dir', help='Location to store rechunked zarr files', required=True)
+    parser.add_argument('-m', '--metadata_file', help='File containing metadata to include in zarr files', required=True)
 
     args = parser.parse_args()
 
-    base_dir = '/caldera/projects/usgs/water/wbeep/conus404_work/'
-    wrf_dir = '/caldera/projects/usgs/water/impd/wrf-conus404/kyoko/wrfout_post'
-    # tmp_dir = '/dev/shm'
+    print(f'HOST: {os.environ.get("HOSTNAME")}')
+    if os.environ.get('HOSTNAME') == 'denali-login2':
+        exit(-1)
 
-    const_file = f'{base_dir}/wrf_constants_conus404_final.nc'
-    metadata_file = f'{base_dir}/wrfout_metadata_w_std.csv'
-    proc_vars_file = f'{base_dir}/wrf2d_vars_drb.csv'
+    index_start = int(args.index)
+    print(f'{index_start=}')
 
-    target_store = f'{base_dir}/test1/target'
-    # temp_store = f'{base_dir}/test1/tmp'
+    base_dir = os.path.realpath(args.base_dir)
+    wrf_dir = os.path.realpath(args.wrf_dir)
+
+    const_file = set_file_path(args.constants_file, base_dir)
+    metadata_file = set_file_path(args.metadata_file, base_dir)
+    proc_vars_file = set_file_path(args.vars_file, base_dir)
+    target_store = f'{set_target_path(args.dst_dir, base_dir)}/target'
+
+    print(f'{base_dir=}')
+    print(f'{wrf_dir=}')
+    print(f'{const_file=}')
+    print(f'{metadata_file=}')
+    print(f'{proc_vars_file=}')
+    print(f'{target_store=}')
+    print('-'*60)
+
+    # base_dir = '/caldera/projects/usgs/water/wbeep/conus404_work/'
+    # wrf_dir = '/caldera/projects/usgs/water/impd/wrf-conus404/kyoko/wrfout_post'
+
+    # const_file = f'{base_dir}/wrf_constants_conus404_final.nc'
+    # metadata_file = f'{base_dir}/wrfout_metadata_w_std.csv'
+    # proc_vars_file = f'{base_dir}/wrf2d_vars_drb.csv'
+
+    # target_store = f'{base_dir}/test1/target'
+
     temp_store = '/dev/shm/tmp'
-    # concat_store = f'{base_dir}/test1/conus404_2019'
-
     base_date = datetime.datetime(1979, 10, 1)
-    # st_date = datetime.datetime(1979, 10, 1)
-    # en_date = datetime.datetime(1982, 10, 1)
-
     num_days = 6
     delta = datetime.timedelta(days=num_days)
 
-    # We can specify a chunk index and the start date is selected based on that
-    # index_start = 66
+    # We specify a chunk index and the start date is selected based on that
     index_start = int(args.index)
-    st_date = base_date + datetime.timedelta(days=num_days*index_start)
+    st_date = base_date + datetime.timedelta(days=num_days * index_start)
     en_date = st_date + delta - datetime.timedelta(days=1)
     print(f'{index_start=}')
 
@@ -172,6 +280,7 @@ def main():
 
     # index_start = int((st_date - base_date).days / num_days)
     print(f'{index_start=}')
+    print('-'*60)
 
     # time_chunk = 144
     time_chunk = num_days * 24
@@ -196,9 +305,9 @@ def main():
 
     # Start up the cluster
     client = Client(n_workers=8, threads_per_worker=1, memory_limit='24GB')
-    # print(client)
 
     print(f'dask tmp directory: {dask.config.get("temporary-directory")}')
+
     # Max total memory in gigabytes for cluster
     total_mem = sum(vv['memory_limit'] for vv in client.scheduler_info()['workers'].values()) / 1024**3
     total_threads = sum(vv['nthreads'] for vv in client.scheduler_info()['workers'].values())
@@ -210,6 +319,7 @@ def main():
 
     max_mem = f'{total_mem / total_threads * max_percent:0.0f}GB'
     print(f'Maximum memory per thread for rechunking: {max_mem}')
+    print('='*60)
 
     # Read variables to process
     df = pd.read_csv(proc_vars_file)

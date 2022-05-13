@@ -4,6 +4,7 @@ import argparse
 import dask
 import fsspec
 import pandas as pd
+import os
 import time
 import xarray as xr
 
@@ -14,6 +15,9 @@ def main():
     parser = argparse.ArgumentParser(description='Create cloud-optimized zarr files from WRF CONUS404')
     parser.add_argument('-i', '--index', help='Index to process', type=int, required=True)
     parser.add_argument('-s', '--step', help='Number of indices to process from start index', type=int, required=True)
+    parser.add_argument('-b', '--base_dir', help='Directory to work in', required=False, default=None)
+    parser.add_argument('-d', '--dst_dir', help='Location to store file zarr file', required=True)
+    parser.add_argument('-z', '--zarr_dir', help='Location of source zarr files', required=True)
 
     args = parser.parse_args()
 
@@ -21,13 +25,30 @@ def main():
     idx_span = args.step
     last_idx = first_idx + idx_span
 
-    base_dir = '/caldera/projects/usgs/water/wbeep/conus404_work'
-    outzarr_dir = f'{base_dir}/zarr_out'
+    base_dir = os.path.realpath(args.base_dir)
+    outzarr_dir = os.path.realpath(args.dst_dir)
+
+    src_zarr = os.path.realpath(f'{args.zarr_dir}/target_*')
+
+    zarr_whole = f'{outzarr_dir}/conus404_whole.zarr'
+
+    # base_dir = '/caldera/projects/usgs/water/wbeep/conus404_work'
+    # outzarr_dir = f'{base_dir}/zarr_out'
+
+    print(f'{first_idx=}')
+    print(f'{idx_span=}')
+    print(f'{last_idx=}')
+    print('-'*60)
+    print(f'{base_dir=}')
+    print(f'{outzarr_dir=}')
+    print(f'{src_zarr=}')
+    print(f'{zarr_whole=}')
 
     time_cnk = 144
 
     fs = fsspec.filesystem('file')
-    zlist = sorted(fs.glob(f'{base_dir}/test1/target_0*'))
+    # zlist = sorted(fs.glob(f'{base_dir}/test1/target_0*'))
+    zlist = sorted(fs.glob(src_zarr))
     num_targets = len(zlist)
 
     if num_targets < last_idx - 1:
@@ -36,8 +57,6 @@ def main():
         print(f'NOTE: Adjusted processing indices')
 
     print(f'Index start: {first_idx}; Index end: {last_idx - 1}')
-
-    zarr_whole = f'{outzarr_dir}/conus404_whole.zarr'
 
     # Start up the cluster
     # client = Client(n_workers=8, threads_per_worker=1, memory_limit='24GB')
@@ -57,6 +76,7 @@ def main():
         ds0 = xr.open_dataset(zlist[0], engine='zarr', chunks={})
         ds1 = xr.open_dataset(zlist[-1], engine='zarr', chunks={})
 
+        # TODO: the freq argument must reflect the time interval (e.g hourly, daily)
         dates = pd.date_range(start=ds0.time[0].values, end=ds1.time[-1].values, freq='1h')
 
         # Have to drop the constant variables (e.g. variables having no time dimension)
@@ -71,7 +91,7 @@ def main():
                      'VAR_SSO', 'XLAND', 'lat', 'lat_u', 'lat_v', 'lon', 'lon_u', 'lon_v',
                      'ZETATOP', 'ZNU', 'ZNW', 'ZS']
 
-        source_dataset = ds0.drop_vars(drop_vars)
+        source_dataset = ds0.drop_vars(drop_vars, errors='ignore')
 
         template = (source_dataset.chunk().pipe(xr.zeros_like).isel(time=0, drop=True).expand_dims(time=len(dates)))
         template['time'] = dates

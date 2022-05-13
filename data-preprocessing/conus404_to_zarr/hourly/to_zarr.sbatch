@@ -15,6 +15,10 @@ export PATH="$PATH:$HOME/miniconda3/bin"
 
 source activate pangeo
 
+base_dir=/caldera/projects/usgs/water/wbeep/conus404_work
+dst_zarr_dir=/caldera/projects/usgs/water/wbeep/conus404_work/zarr_Z
+src_zarr_dir=/caldera/projects/usgs/water/wbeep/conus404_work/rechunk_tmp
+
 echo $SLURM_ARRAY_TASK_ID
-python /caldera/projects/usgs/water/wbeep/conus404_work/conus404_to_zarr.py -i $SLURM_ARRAY_TASK_ID -s $STEP
+python /caldera/projects/usgs/water/wbeep/conus404_work/conus404_to_zarr.py -i $SLURM_ARRAY_TASK_ID -s $STEP -b $base_dir -z $src_zarr_dir -d $dst_zarr_dir
 
