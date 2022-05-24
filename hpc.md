@@ -42,13 +42,13 @@ Now update your conda package manager with packages from the conda-forge channel
 conda config --add channels conda-forge --force 
 mamba update --all
 ```
-This will create a ``./.condarc`` in your home
+This will create a ``.condarc`` configuration file in your home
 directory with the `conda-forge` channel setting. 
 
 Now let's create a new conda environment for our HyTest work:
 ```bash
 mamba create -n pangeo -c conda-forge \
-      python dask jupyterlab dask-jobqueue ipywidgets \
+      python dask jupyterlab dask-jobqueue ipykernel ipywidgets \
       xarray zarr numcodecs hvplot geoviews datashader  \
       jupyter-server-proxy widgetsnbextension dask-labextension intake-xarray
 ```
