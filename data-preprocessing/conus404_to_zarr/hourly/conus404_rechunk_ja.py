@@ -344,11 +344,11 @@ def main():
         # rechunker requires empty tmp and target dirs
         try:
             fs.rm(temp_store, recursive=True)
-        except:
+        except FileNotFoundError:
             pass
         try:
             fs.rm(tstore_dir, recursive=True)
-        except:
+        except FileNotFoundError:
             pass
 
         time.sleep(3)  # wait for files to be removed (necessary? hack!)

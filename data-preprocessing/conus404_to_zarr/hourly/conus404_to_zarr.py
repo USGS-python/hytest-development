@@ -123,7 +123,7 @@ def main():
     if dask.config.get("temporary-directory") == '/dev/shm':
         try:
             fs.rm(f'/dev/shm/dask-worker-space', recursive=True)
-        except:
+        except FileNotFoundError:
             pass
 
     print(f'Total time: {time.time() - t1_proc:0.3f} s')
