@@ -1,13 +1,11 @@
 #!/usr/bin/env python
 
-import numpy as np
-import os
 import argparse
 import dask
 import datetime
 import fsspec
-# import numpy as np
-# import pandas as pd
+import numpy as np
+import os
 import rechunker
 import time
 import xarray as xr
@@ -17,42 +15,72 @@ from typing import Dict, Optional, Union
 from dask.distributed import Client
 
 
-def teten_rh(qv: Union[float, xr.Dataset, xr.DataArray],
-             pres: Union[float, xr.Dataset, xr.DataArray],
-             temp: Union[float, xr.Dataset, xr.DataArray]):
-    """Compute relative humidity using Teten's formula
+# ===================================
+# Vapor pressure formulas
+# ===================================
+def vp(qv: Union[float, xr.Dataset, xr.DataArray],
+       pressure: Union[float, xr.Dataset, xr.DataArray]):
+    """Water vapor pressure from mixing ratio and pressure
 
     :param qv: Water vapor mixing ratio [kg kg-1]
-    :param pres: Surface pressure [Pa]
-    :param temp: Temperature [K]
+    :param pressure: Pressure [Pa]
     """
-    # Teten's eqn
-    # es0 = 6.113  # Saturation vapor pressure reference value; [hPa]
-    # es0 *= 100   # [Pa]
 
-    # epsilon = 0.622  # Rd / Rv; []
+    # NOTE: Suggested in Milly DRB spreadsheet
+    # NOTE: Suggested for use in WRF forum: https://forum.mmm.ucar.edu/phpBB3/viewtopic.php?t=9134#:~:text=Re%3A%20relative%20humidity&text=The%20Relative%20Humidity%20(RH)%20is,you%20can%20easily%20obtain%20RH.
+    # NOTE: Used by Teten relative humidity formula
+    epsilon = 0.622  # Rd / Rv; []
 
-    # temp_c = temp - 273.15   # [C]
-
-    # Vapor pressure
-    e = compute_vp(qv, pres)
-    # e = (qv * pres) / (epsilon + qv)   # [Pa]
-
-    # Saturation vapor pressure
-    es = teten_saturation_vp(temp)
-    # es = es0 * np.exp(17.269 * temp_c / (temp_c + 237.3))   # [Pa]
-    # es = es0 * math.exp((17.269 * (temp - 273.15)) / (temp - 35.86))   # [Pa]
-    rh = 100.0 * (e / es)   # 0-100%
-
-    return rh
+    e = qv * pressure / (epsilon + qv)
+    return e
 
 
-def teten_saturation_vp(temperature: Union[float, xr.Dataset, xr.DataArray]):
-    """Saturation vapor pressure from temperature
+# ===================================
+# Saturation vapor pressure formulas
+# ===================================
+def saturation_vp_bolton(temperature: Union[float, xr.Dataset, xr.DataArray]):
+    """Saturation vapor pressure from Bolton formula (1980)
 
     :param temperature: Temperature [K]
     """
-    # Teten's eqn
+    # Note: This is the formulation used for sat vp in the relative humidity
+    #       computation suggested in the WRF forum.
+    #       https://forum.mmm.ucar.edu/phpBB3/viewtopic.php?t=9134#:~:text=Re%3A%20relative%20humidity&text=The%20Relative%20Humidity%20(RH)%20is,you%20can%20easily%20obtain%20RH.
+
+    es0 = 611.2   # Sautration vapor pressure reference value; [Pa]
+    svp2 = 17.67
+    svp3 = 29.65
+    svpt0 = 273.15   # [K]
+
+    es = es0 * np.exp(svp2 * (temperature - svpt0) / (temperature - svp3))
+    return es
+
+
+def saturation_vp_magnus(temperature: Union[float, xr.Dataset, xr.DataArray]):
+    """Magnus saturation vapor pressure formula
+
+    :param temperature: Temperature [K]
+    """
+
+    # Lawrence (2005), eqn 6
+    # Relative error less than 0.4% over -40C <= t <= 50C
+
+    c1 = 610.94   # [Pa]
+    a1 = 17.625
+    b1 = 243.04   # [C]
+
+    temp_c = temperature - 273.15
+    es = c1 * np.exp(a1 * temp_c / (b1 + temp_c))
+
+    print(f'{es=}')
+    return es
+
+
+def saturation_vp_teten(temperature: Union[float, xr.Dataset, xr.DataArray]):
+    """Teten's formula for saturation vapor pressure from temperature
+
+    :param temperature: Temperature [K]
+    """
     es0 = 6.113  # Saturation vapor pressure reference value; [hPa]
     es0 *= 100   # [Pa]
 
@@ -63,56 +91,65 @@ def teten_saturation_vp(temperature: Union[float, xr.Dataset, xr.DataArray]):
     return es
 
 
-def magnus_sat_vp(temp):
-    # Magnus saturation vapor pressure formula
-    # Relative error < 0.4% over -40C <= t <= 50C
-    # Lawrence (2005), eqn 6
-    c1 = 610.94   # [Pa]
-    a1 = 17.625
-    b1 = 243.04   # [C]
+# ===================================
+# Relative humidity formulas
+# ===================================
+def rh(qv: Union[float, xr.Dataset, xr.DataArray],
+       pressure: Union[float, xr.Dataset, xr.DataArray],
+       temperature: Union[float, xr.Dataset, xr.DataArray]):
+    """Relative humidity
 
-    temp_c = temp - 273.15
-    es = c1 * np.exp(a1 * temp_c / (b1 + temp_c))
+    :param qv: Water vapor mixing ratio [kg kg-1]
+    :param pressure: Surface pressure [Pa]
+    :param temperature: Temperature [K]
+    """
 
-    print(f'{es=}')
-    return es
-
-
-def compute_rh(vp_mixing_ratio, pressure, temperature):
-    # saturation vapor pressure
+    # Saturation vapor pressure
     num1 = temperature - 273.15
     den1 = temperature - 29.65
     es = 6.112 * np.exp(17.67 * num1 / den1)   # [Pa]
 
-    # saturation water vapor mixing ratio
+    # Saturation water vapor mixing ratio
     num2 = 0.622 * es
     den2 = 0.01 * pressure - 0.378 * es
     qvs = num2 / den2
 
-    # Compute relative humidity
-    sh = vp_mixing_ratio / qvs
-    rh = 100 * np.maximum(np.minimum(sh, 1.0), 0.0)
-    return rh
+    # Specific humidity
+    sh = qv / qvs
+
+    # Relative humidity
+    return 100 * np.maximum(np.minimum(sh, 1.0), 0.0)
 
 
-def compute_specific_humidity(vp_mixing_ratio: Union[float, xr.Dataset, xr.DataArray]):
-    """Specific humdity from vapor pressure mixing ratio
+def rh_teten(qv: Union[float, xr.Dataset, xr.DataArray],
+             pressure: Union[float, xr.Dataset, xr.DataArray],
+             temperature: Union[float, xr.Dataset, xr.DataArray]):
+    """Relative humidity using Teten's formula
 
-    :param vp_mixing_ratio: Vapor pressure mixing ratio [kg kg-1]"""
-    return vp_mixing_ratio / (1 + vp_mixing_ratio)
-
-
-def compute_vp(vp_mixing_ratio: Union[float, xr.Dataset, xr.DataArray],
-               pressure: Union[float, xr.Dataset, xr.DataArray]):
-    """Water vapor pressure from mixing ratio and pressure
-
-    :param vp_mixing_ratio: Vapor pressure mixing ratio [kg kg-1]
-    :param pressure: Pressure [Pa]
+    :param qv: Water vapor mixing ratio [kg kg-1]
+    :param pressure: Surface pressure [Pa]
+    :param temperature: Temperature [K]
     """
-    epsilon = 0.622  # Rd / Rv; []
 
-    e = vp_mixing_ratio * pressure / (epsilon + vp_mixing_ratio)
-    return e
+    # Vapor pressure
+    e = vp(qv, pressure)   # [Pa]
+    # e = (qv * pres) / (epsilon + qv)   # [Pa]
+
+    # Saturation vapor pressure
+    es = saturation_vp_teten(temperature)   # [Pa]
+
+    # Relative humidity
+    return 100.0 * (e / es)   # 0-100%
+
+
+# ===================================
+# Specific humidity formulas
+# ===================================
+def specific_humidity(qv: Union[float, xr.Dataset, xr.DataArray]):
+    """Specific humdity from water vapor mixing ratio
+
+    :param qv: Water vapor mixing ratio [kg kg-1]"""
+    return qv / (1 + qv)
 
 
 # def compute_saturation_vp(temperature: Union[float, xr.Dataset, xr.DataArray]):
@@ -126,32 +163,43 @@ def compute_vp(vp_mixing_ratio: Union[float, xr.Dataset, xr.DataArray],
 #     return 611 * np.exp(17.269 * (temperature - 273.15) / (temperature - 35.85))
 
 
-def compute_dewpoint_temperature(temperature, vp, sat_vp):
+# ===================================
+# Dewpoint temperature formulas
+# ===================================
+def dewpoint_temperature(temperature: Union[float, xr.Dataset, xr.DataArray],
+                         vapor_pressure: Union[float, xr.Dataset, xr.DataArray],
+                         sat_vp: Union[float, xr.Dataset, xr.DataArray]):
+    """Dewpoint temperature
+
+    :param temperature: Temperature [K]
+    :param vapor_pressure: Vapor pressure [Pa]
+    :param sat_vp: Saturation vapor pressure [Pa]
+    """
+
     #  237.3 * X / ( 17.269 - X ) ;  where X = { ln ( E2 / ESAT2 ) + 17.269 * ( T2 - 273.15 ) / ( T2 - 35.85 ) }
     # equation from Milly's DRB spreadsheet
-    x = np.log(vp / sat_vp) + 17.269 * (temperature - 273.15) / (temperature - 35.85)
+    x = np.log(vapor_pressure / sat_vp) + 17.269 * (temperature - 273.15) / (temperature - 35.85)
     return 237.3 * x / (17.269 - x)
 
 
-def compute_dewpoint_temperature_magnus(vp_mixing_ratio: Union[float, xr.Dataset, xr.DataArray],
-                                        pressure: Union[float, xr.Dataset, xr.DataArray]):
-    """Compute dewpoint temperature based on Magnus formula
+def dewpoint_temperature_magnus(qv: Union[float, xr.Dataset, xr.DataArray],
+                                pressure: Union[float, xr.Dataset, xr.DataArray]):
+    """Dewpoint temperature based on Magnus formula
 
-    :param vp_mixing_ratio: Vapor pressure mixing ratio [kg kg-1]
+    :param qv: Water vapor mixing ratio [kg kg-1]
     :param pressure: Pressure [Pa]
     """
+
     # Lawrence (2005), eqn 7
     c1 = 610.94   # [Pa]
     a1 = 17.625
     b1 = 243.04   # [C]
 
     # Vapor pressure
-    e = compute_vp(vp_mixing_ratio, pressure)
+    e = vp(qv, pressure)
 
     # Dewpoint temperature
-    td = (b1 * np.log(e / c1)) / (a1 - np.log(e / c1)) + 273.15
-
-    return td
+    return (b1 * np.log(e / c1)) / (a1 - np.log(e / c1)) + 273.15   # [K]
 
 
 def read_metadata(filename: str):
@@ -351,7 +399,7 @@ def set_target_path(path: str, base_dir: Optional[str] = None, verbose: Optional
 
 
 def main():
-    parser = argparse.ArgumentParser(description='Create cloud-optimized zarr files from WRF CONUS404 model output files')
+    parser = argparse.ArgumentParser(description='Create cloud-optimized zarr files for CONUS404 derived variables')
     parser.add_argument('-i', '--index', help='Index to process', type=int, required=True)
     parser.add_argument('-b', '--base_dir', help='Directory to work in', required=False, default=None)
     # parser.add_argument('-w', '--wrf_dir', help='Base directory for WRF model output files', required=True)
@@ -505,11 +553,11 @@ def main():
 
         ds2 = ds[['T2', 'Q2', 'PSFC']].isel(time=slice(c_start, c_end))
 
-        ds2['RH2'] = teten_rh(ds2.Q2, ds2.PSFC, ds2.T2)
-        ds2['SH2'] = compute_specific_humidity(ds2.Q2)
-        ds2['E2'] = compute_vp(ds2.Q2, ds2.PSFC)
-        ds2['ESAT2'] = teten_saturation_vp(ds2.T2)
-        ds2['TD2'] = compute_dewpoint_temperature_magnus(ds2.Q2, ds2.PSFC)
+        ds2['RH2'] = rh_teten(ds2.Q2, ds2.PSFC, ds2.T2)
+        ds2['SH2'] = specific_humidity(ds2.Q2)
+        ds2['E2'] = vp(ds2.Q2, ds2.PSFC)
+        ds2['ESAT2'] = saturation_vp_teten(ds2.T2)
+        ds2['TD2'] = dewpoint_temperature_magnus(ds2.Q2, ds2.PSFC)
 
         ds2.compute()
         end = time.time()
