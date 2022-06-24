@@ -166,6 +166,34 @@ def specific_humidity(qv: Union[float, xr.Dataset, xr.DataArray]):
 # ===================================
 # Dewpoint temperature formulas
 # ===================================
+
+# !!!~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~!!!
+# !~ from WRF phys/module_diag_functions.F
+# !~ Name:
+# !~    calc_Dewpoint
+# !~
+# !~ Description:
+# !~    This function approximates dewpoint given temperature and rh.
+# !~
+# !!!~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~!!!
+# FUNCTION calc_Dewpoint ( tC, rh) result( Dewpoint )
+#   !~ Variable Declaration
+#   !  --------------------
+#   real, intent ( in ) :: tC
+#   real, intent ( in ) :: rh
+#   real                :: Dewpoint
+#
+#   real :: term, es, e1, e, logs, expon
+#
+#   expon    = ( 7.5*tC ) / ( 237.7+tC )
+#   es       = 6.112 * ( 10**expon )     ! Saturated vapor pressure
+#   e        = es * ( rh/100.0 )         ! Vapor pressure
+#   logs     = LOG10 ( e/6.112 )
+#   Dewpoint = ( 237.7*logs ) / ( 7.5-logs )
+#
+# END FUNCTION calc_Dewpoint
+
+
 def dewpoint_temperature(temperature: Union[float, xr.Dataset, xr.DataArray],
                          vapor_pressure: Union[float, xr.Dataset, xr.DataArray],
                          sat_vp: Union[float, xr.Dataset, xr.DataArray]):
@@ -207,6 +235,7 @@ def read_metadata(filename: str):
 
     :param filename: Path to metadata file
     """
+
     fhdl = open(filename, 'r')   # , encoding='ascii')
     rawdata = fhdl.read().splitlines()
     fhdl.close()
@@ -325,8 +354,8 @@ def rechunker_wrapper(source_store: Union[xr.Dataset, xr.DataArray], target_stor
 def set_file_path(path1: str, path2: Optional[str] = None):
     """Helper function to check/set the full path to a file.
 
-    :param path1: absolute or relative path to a file (must include filename)
-    :param path2: optional path to use when path1 is a filename
+    :param path1: Absolute or relative path to a file (must include filename)
+    :param path2: Optional path to use when path1 is a filename
     """
 
     # file_path = None
