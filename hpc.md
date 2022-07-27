@@ -49,7 +49,7 @@ Now let's create a new conda environment for our HyTest work:
 ```bash
 mamba create -n pangeo -c conda-forge \
       python dask jupyterlab dask-jobqueue ipykernel ipywidgets \
-      xarray zarr numcodecs hvplot geoviews datashader  \
+      xarray zarr numcodecs hvplot geoviews datashader xesmf \
       jupyter-server-proxy widgetsnbextension dask-labextension intake-xarray
 ```
 *Note: you can add additional conda packages you need to this list.  Packages available through conda-forge can be explored at https://anaconda.org. 
